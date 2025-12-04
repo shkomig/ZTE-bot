@@ -1,8 +1,8 @@
 
 # 📈 Zero Trading Expert (ZTE) - Master Control Protocol
 
-**תאריך עדכון אחרון:** 04/12/2025 (15:00)
-**גרסה:** 3.5.1 (Bug Fixes + Stability)
+**תאריך עדכון אחרון:** 05/12/2025 (21:55)
+**גרסה:** 3.5.2 (Paper Trading Fix + RAG Cleanup)
 **סטטוס:** 🟢 פעיל ורץ (Active & Running)
 **פורט:** 5002 ✅ LIVE
 **TWS:** Port 7497 (Paper Trading)
@@ -10,10 +10,94 @@
 ### 📊 ביצועים:
 | מדד | ערך | הערה |
 |-----|------|------|
-| **RAG Memory** | 686 פריטים | נתונים היסטוריים מיובאים |
-| **RAG Win Rate** | 98.7% | ⚠️ **לא אמין!** רק יחס הייבוא |
+| **RAG Memory** | 54 פריטים | ✅ ידע טכני בלבד (עסקאות מיובאות נמחקו!) |
+| **RAG Win Rate** | N/A | 🧹 נוקה - ממתין לעסקאות אמיתיות |
 | **LIVE Win Rate** | N/A | 🆕 ממתין למעקב אמיתי |
 | **Max Positions** | **10** | 🆕 Tier1: 5 + Tier2: 5 |
+
+---
+
+## 🆕 V3.5.2 Paper Trading Fix + RAG Cleanup (05/12/2025 21:50)
+
+### 🧹 ניקוי RAG Memory:
+
+**הבעיה:** 677 עסקאות מיובאות עם נתונים לא אמינים!
+- Win Rate של 98.7% - לא ריאלי
+- Selection Bias - רק עסקאות "מוצלחות" יובאו
+- מטעה את ה-RAG בהחלטות
+
+**הפתרון:** מחיקה מלאה של עסקאות מיובאות!
+```python
+# MEMORY/chroma_trading_db - נמחק ונבנה מחדש
+# נשארו רק 54 פריטי ידע טכני (לא עסקאות)
+```
+
+| לפני | אחרי |
+|------|------|
+| 686 פריטים | 54 פריטים |
+| 677 עסקאות מיובאות | 0 עסקאות |
+| 9 ידע טכני | 54 ידע טכני (מורחב) |
+
+### 🎮 PAPER_TRADING_MODE - פתרון RVOL:
+
+**הבעיה:** Paper Trading מחזיר נתוני Volume שגויים!
+- `calculate_real_rvol()` מחזיר 0.0x
+- כל המניות נפסלות (RVOL < 1.5)
+- הבוט לא פותח פוזיציות
+
+**הפתרון:** מצב Paper Trading עם RVOL ברירת מחדל:
+```python
+# auto_trader_tws.py - שורות 119-125
+PAPER_TRADING_MODE = True  # 🎮 Set to False for LIVE trading!
+DEFAULT_RVOL = 2.0         # Default RVOL for Paper Trading
+
+# בחישוב RVOL:
+if PAPER_TRADING_MODE:
+    return DEFAULT_RVOL  # Use default, skip buggy volume data
+```
+
+### 🐛 תיקוני Duplicate Orders:
+
+**הבעיה:** 31 הזמנות כפולות! (14 ל-V בלבד)
+- `openTrades()` לא אמין - מחזיר רשימות חלקיות
+- `_add_sl_tp_to_existing_positions()` הוסיף כפולים
+
+**הפתרון:** שימוש ב-`reqAllOpenOrders()`:
+```python
+def _add_sl_tp_to_existing_positions(self):
+    # Use reqAllOpenOrders() instead of openTrades()
+    existing_orders = self.ib.reqAllOpenOrders()
+    self.ib.sleep(1)
+    
+    # Check if SL/TP already exist before adding
+    for symbol, data in self.positions.items():
+        has_sl = any(o for o in existing_orders 
+                     if o.contract.symbol == symbol 
+                     and isinstance(o, (StopOrder, StopLimitOrder)))
+        has_tp = any(o for o in existing_orders 
+                     if o.contract.symbol == symbol 
+                     and isinstance(o, LimitOrder))
+        
+        if not has_sl and not has_tp:
+            # Only then add SL/TP
+```
+
+### 📋 Current Positions (05/12/2025 22:00):
+
+| Symbol | Sector | Shares | Status |
+|--------|--------|--------|--------|
+| NVDA | TECH | 27 | ✅ SL/TP |
+| AMD | TECH | 23 | ✅ SL/TP |
+| QCOM | SEMI | 28 | ✅ SL/TP |
+| CRM | SOFTWARE | 20 | ✅ SL/TP |
+| AVGO | SEMI | 13 | ✅ SL/TP |
+
+**Sector Exposure:**
+- TECH: 2/2 (מלא - NVDA, AMD)
+- SEMI: 2/2 (מלא - QCOM, AVGO)
+- SOFTWARE: 1/2 (CRM)
+
+**Total Orders:** 10 (5 SL + 5 TP) ✅
 
 ---
 
@@ -284,15 +368,7 @@ def check_sector_exposure(self, symbol: str) -> bool:
 
 ### 📋 Current Positions - Sector Exposure:
 
-| Symbol | Sector | Count | Status |
-|--------|--------|-------|--------|
-| V | FINANCE | 2/2 | 🔴 מלא |
-| BAC | FINANCE | 2/2 | 🔴 מלא |
-| ZS | SOFTWARE | 1/2 | 🟢 פנוי |
-| LRCX | SEMI | 1/2 | 🟢 פנוי |
-| SBUX | CONSUMER | 1/2 | 🟢 פנוי |
-
-**הבוט לא יפתח פוזיציות חדשות ב-FINANCE** (V + BAC = 2/2)
+**⚠️ סעיף זה מתעדכן אוטומטית - ראה V3.5.2 לפוזיציות עדכניות!**
 
 ---
 
