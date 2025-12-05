@@ -1370,12 +1370,35 @@ def main():
                 time.sleep(SCAN_INTERVAL)
                 continue
             
-            # Prioritize gap stocks at open, otherwise scan all
-            scan_list = SYMBOLS
+            # Prioritize gap stocks at open, otherwise use balanced sector rotation
             if gap_stocks and current_session in [TradingSession.OPENING_BELL, TradingSession.MID_MORNING]:
                 gap_symbols = [g['symbol'] for g in gap_stocks[:5]]
                 scan_list = gap_symbols + [s for s in SYMBOLS if s not in gap_symbols]
                 log(f"🌅 Prioritizing gap stocks: {gap_symbols}")
+            else:
+                # 🔀 V3.5.3: Balanced Sector Rotation (Round-Robin)
+                # This ensures fair distribution across all sectors instead of always
+                # scanning TECH first. Each cycle starts with a different sector.
+                sectors = list(SECTOR_MAP.keys())
+                
+                # Rotate sector order based on cycle number
+                sector_offset = cycle % len(sectors)
+                rotated_sectors = sectors[sector_offset:] + sectors[:sector_offset]
+                
+                # Build scan list by taking one stock from each sector in rotation
+                scan_list = []
+                max_stocks_per_sector = max(len(SECTOR_MAP[s]) for s in sectors)
+                
+                for i in range(max_stocks_per_sector):
+                    for sector in rotated_sectors:
+                        sector_stocks = SECTOR_MAP[sector]
+                        if i < len(sector_stocks):
+                            scan_list.append(sector_stocks[i])
+                
+                # Log the first stock from each sector (shows the rotation)
+                first_per_sector = [SECTOR_MAP[s][0] for s in rotated_sectors if SECTOR_MAP[s]]
+                log(f"🔀 Sector rotation order: {' → '.join(rotated_sectors[:4])}...")
+                log(f"   First in queue: {first_per_sector[:5]}")
             
             # Scan symbols
             signals_found = 0
