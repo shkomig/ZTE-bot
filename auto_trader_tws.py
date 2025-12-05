@@ -116,6 +116,11 @@ TIER2_REQUIRE_STRONG_BUY = True  # Tier 2: Only STRONG_BUY actions
 # DAY TRADING FILTERS
 # ============================================================================
 
+# Paper Trading Mode - TWS Paper doesn't return accurate volume data
+# Set to True to bypass RVOL checks (for testing)
+PAPER_TRADING_MODE = True    # ⚠️ Set to False for LIVE trading!
+PAPER_DEFAULT_RVOL = 2.0     # Default RVOL to use in Paper mode
+
 MIN_RVOL = 1.5               # Minimum Relative Volume (1.5x average)
 MIN_PRICE = 5.0              # Minimum stock price
 MAX_PRICE = 500.0            # Maximum stock price
@@ -1386,8 +1391,12 @@ def main():
                     
                     price = data["current_price"]
                     
-                    # 2. Calculate REAL RVOL (use cached or calculate)
-                    if symbol not in trader.avg_volumes or cycle % 20 == 1:
+                    # 2. Calculate REAL RVOL (or use default in Paper mode)
+                    if PAPER_TRADING_MODE:
+                        # Paper Trading: TWS doesn't return accurate volume
+                        # Use default RVOL to allow trading
+                        rvol = PAPER_DEFAULT_RVOL
+                    elif symbol not in trader.avg_volumes or cycle % 20 == 1:
                         # Refresh real RVOL every 20 cycles or if not cached
                         rvol = trader.calculate_real_rvol(symbol)
                     else:
