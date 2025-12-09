@@ -42,11 +42,14 @@ from CORE_TRADING.pattern_detector import PatternDetector
 # V3.4: Live Performance Tracking
 from CORE_TRADING.live_performance import LivePerformanceTracker
 
+# V3.7.2: Trading Memory for Learning from Trades
+from CORE_TRADING.trading_memory import TradingMemory
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-API_URL = "http://localhost:5002/api"
+API_URL = "http://localhost:5001/api"  # Fixed: Match api_server_trading.py port
 TWS_HOST = "127.0.0.1"
 TWS_PORT = 7497  # 7497 = Paper, 7496 = Live
 CLIENT_ID = random.randint(100, 999)  # Random client ID to avoid conflicts
@@ -89,10 +92,11 @@ DAILY_LOG_FILE = "daily_pnl.jsonl"
 # ============================================================================
 # RISK MANAGEMENT (MCP Compliant - DAY TRADING OPTIMIZED)
 # ============================================================================
+# V3.7.3: Optimized for Day Trading - realistic TP/SL based on actual daily moves
 
 MAX_POSITION_VALUE = 5000    # Max $ per position
-MAX_SL_PCT = 0.01            # Maximum 1% Stop Loss (DAY TRADING - TIGHT!)
-MAX_TP_PCT = 0.02            # Maximum 2% Take Profit (1:2 R/R)
+MAX_SL_PCT = 0.0125          # 1.25% Stop Loss (FIXED: was 0.75% - too tight!)
+MAX_TP_PCT = 0.025           # 2.5% Take Profit (R:R = 1:2) - Realistic for volatility
 MIN_CONFIDENCE = 0.50        # Minimum confidence to execute
 
 # Daily Risk Limits
@@ -127,9 +131,9 @@ MAX_PRICE = 500.0            # Maximum stock price
 MIN_SPREAD_PCT = 0.001       # Minimum spread (0.1%)
 MAX_SPREAD_PCT = 0.005       # Maximum spread (0.5%) - avoid illiquid stocks
 
-# Trailing Stop Settings
-TRAIL_ACTIVATION_PCT = 0.01  # Start trailing after 1% profit
-TRAIL_DISTANCE_PCT = 0.005   # 0.5% trailing distance
+# Trailing Stop Settings (V3.7.3 - Day Trading Optimized)
+TRAIL_ACTIVATION_PCT = 0.005  # Start trailing after 0.5% profit (earlier lock-in!)
+TRAIL_DISTANCE_PCT = 0.003    # 0.3% trailing distance (tighter for day trading)
 
 # ============================================================================
 # TRADING SESSIONS (Eastern Time)
@@ -411,6 +415,13 @@ class TWSTrader:
         # V3.4: Live Performance Tracking (REAL Win Rate!)
         self.live_tracker = LivePerformanceTracker()
         
+        # V3.7.2: Trading Memory for Learning from Trades
+        self.trading_memory = TradingMemory()
+
+        # API Health Check (CRITICAL FIX)
+        self.api_last_check = datetime.now()
+        self.api_healthy = False
+
     def connect(self) -> bool:
         """Connect to TWS."""
         try:
@@ -558,7 +569,29 @@ class TWSTrader:
             self.ib.disconnect()
             self.connected = False
             print("[TWS] Disconnected")
-    
+
+    def check_api_health(self) -> bool:
+        """
+        Check if API server is responsive (cached for 30s).
+        CRITICAL: Prevents placing orders when API is down.
+        """
+        # Cache API health checks for 30 seconds
+        if (datetime.now() - self.api_last_check).seconds < 30:
+            return self.api_healthy
+
+        try:
+            response = requests.get(f"{API_URL}/health", timeout=3)
+            self.api_healthy = response.status_code == 200
+            self.api_last_check = datetime.now()
+            if not self.api_healthy:
+                log(f"⚠️ API Health Check: HTTP {response.status_code}")
+            return self.api_healthy
+        except Exception as e:
+            self.api_healthy = False
+            self.api_last_check = datetime.now()
+            log(f"⚠️ API Health Check Failed: {e}")
+            return False
+
     def get_market_data(self, symbol: str) -> Optional[Dict]:
         """Get real-time market data for a symbol."""
         try:
@@ -808,7 +841,21 @@ class TWSTrader:
         rvol = data.get("rvol", 1.0)
         bid = data.get("bid", price)
         ask = data.get("ask", price)
-        
+
+        # ============ CRITICAL FIX: CHECK ACTUAL TWS POSITIONS ============
+        # MUST verify actual TWS positions, not just internal tracking
+        # This prevents duplicate orders if bot restarts or API fails
+        try:
+            tws_positions = self.ib.positions()
+            for pos in tws_positions:
+                if pos.contract.symbol == symbol and abs(pos.position) > 0:
+                    return False, f"Already in position (TWS: {int(pos.position)} shares)"
+        except Exception as e:
+            log(f"⚠️ Failed to check TWS positions: {e}")
+            # Fail-safe: If we can't check positions, don't trade
+            return False, "Cannot verify positions - safety block"
+        # ==================================================================
+
         # Price filter
         if price < MIN_PRICE:
             return False, f"Price too low (${price:.2f} < ${MIN_PRICE})"
@@ -1278,6 +1325,36 @@ class TWSTrader:
                 
                 log(f"📊 {symbol} Exit: ${exit_price:.2f} | P&L: {pnl_pct:+.2f}% (${pnl_usd:+.2f}) | {exit_reason}")
                 
+                # ============= V3.7.2 LEARNING FROM TRADES =============
+                # Store trade in ChromaDB for learning!
+                try:
+                    sector = "UNKNOWN"
+                    for sec, symbols in SECTOR_MAP.items():
+                        if symbol in symbols:
+                            sector = sec
+                            break
+                    
+                    trade_data = {
+                        "symbol": symbol,
+                        "entry_price": closed_pos.entry_price,
+                        "exit_price": exit_price,
+                        "profit_pct": pnl_pct,
+                        "strategy": exit_reason,
+                        "signals": [],  # Could add Phase1 signals here
+                        "atr": 0,
+                        "score": closed_pos.confidence if hasattr(closed_pos, 'confidence') else 0,
+                        "timestamp": datetime.now().isoformat(),
+                        "context": f"Sector: {sector}, Action: {closed_pos.action}, Entry: ${closed_pos.entry_price:.2f}, Exit: ${exit_price:.2f}"
+                    }
+                    
+                    doc_id = self.trading_memory.store_trade(trade_data)
+                    if doc_id:
+                        outcome = "WIN" if pnl_pct > 0 else "LOSS"
+                        log(f"🧠 Trade learned: {symbol} ({outcome}) → Memory ID: {doc_id[:16]}...")
+                except Exception as e:
+                    log(f"⚠️ Failed to store trade for learning: {e}")
+                # ========================================================
+                
                 # Update daily P&L
                 self.daily_pnl.update_trade(pnl_usd, is_win)
         
@@ -1482,7 +1559,12 @@ def main():
                     
                     # 5. Check Phase 1 recommendation for filtering
                     phase1_rec = phase1_analysis.get("recommendation", "NEUTRAL")
-                    
+
+                    # CRITICAL: Check API health before making request
+                    if not trader.check_api_health():
+                        log(f"   ⏭️ API server down - skipping {symbol}")
+                        continue
+
                     response = requests.post(f"{API_URL}/analyze", json=payload, timeout=30)
                     
                     if response.status_code == 200:
