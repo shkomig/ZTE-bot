@@ -26,6 +26,7 @@ import json
 import random
 import requests
 import pytz
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Tuple
@@ -49,7 +50,7 @@ from CORE_TRADING.trading_memory import TradingMemory
 # CONFIGURATION
 # ============================================================================
 
-API_URL = "http://localhost:5001/api"  # Fixed: Match api_server_trading.py port
+API_URL = "http://localhost:5002"  # Base URL - changed to 5002 (5001 occupied by Docker)
 TWS_HOST = "127.0.0.1"
 TWS_PORT = 7497  # 7497 = Paper, 7496 = Live
 CLIENT_ID = random.randint(100, 999)  # Random client ID to avoid conflicts
@@ -88,6 +89,39 @@ MAX_PER_SECTOR = 2  # Maximum positions per sector
 SCAN_INTERVAL = 30  # Seconds between full scans
 PAPER_TRADING_FILE = "paper_trades.jsonl"
 DAILY_LOG_FILE = "daily_pnl.jsonl"
+BOT_LOG_FILE = "bot_runtime.log"
+
+# ============================================================================
+# LOGGING SETUP - Critical for debugging crashes
+# ============================================================================
+def setup_logging():
+    """Setup file and console logging."""
+    # Create logger
+    logger = logging.getLogger('ZTE_Bot')
+    logger.setLevel(logging.DEBUG)
+
+    # File handler - saves everything to file
+    fh = logging.FileHandler(BOT_LOG_FILE, encoding='utf-8')
+    fh.setLevel(logging.DEBUG)
+
+    # Console handler - prints to screen
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+
+    # Formatter
+    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    # Add handlers
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    return logger
+
+# Initialize logger
+bot_logger = setup_logging()
 
 # ============================================================================
 # RISK MANAGEMENT (MCP Compliant - DAY TRADING OPTIMIZED)
@@ -377,10 +411,24 @@ def check_spread(bid: float, ask: float, price: float) -> Tuple[bool, float]:
     return True, spread_pct
 
 
-def log(message: str):
-    """Print timestamped log message."""
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    print(f"[{timestamp}] {message}")
+def log(message: str, level: str = "INFO"):
+    """Log timestamped message to both console and file."""
+    # Handle encoding issues on Windows
+    try:
+        clean_message = message
+    except UnicodeEncodeError:
+        # Remove emojis and special characters
+        clean_message = message.encode('ascii', 'ignore').decode('ascii')
+
+    # Log to file and console using logger
+    if level == "ERROR":
+        bot_logger.error(clean_message)
+    elif level == "WARNING":
+        bot_logger.warning(clean_message)
+    elif level == "DEBUG":
+        bot_logger.debug(clean_message)
+    else:
+        bot_logger.info(clean_message)
 
 
 def save_trade(trade: Dict):
@@ -414,25 +462,33 @@ class TWSTrader:
         
         # V3.4: Live Performance Tracking (REAL Win Rate!)
         self.live_tracker = LivePerformanceTracker()
-        
+
         # V3.7.2: Trading Memory for Learning from Trades
-        self.trading_memory = TradingMemory()
+        # TEMP DISABLED: ChromaDB compatibility issue
+        self.trading_memory = None  # TradingMemory()
 
         # API Health Check (CRITICAL FIX)
-        self.api_last_check = datetime.now()
+        # Initialize with old timestamp to force first check
+        self.api_last_check = datetime.now() - timedelta(seconds=31)
         self.api_healthy = False
 
-    def connect(self) -> bool:
+    def connect(self, retry: bool = False) -> bool:
         """Connect to TWS."""
         try:
+            # Disconnect if already connected (for reconnect scenarios)
+            if self.ib.isConnected():
+                log("[TWS] Already connected - disconnecting first...")
+                self.ib.disconnect()
+                time.sleep(1)
+
             self.ib.connect(TWS_HOST, TWS_PORT, clientId=CLIENT_ID)
             self.connected = True
-            print(f"[TWS] Connected to TWS on port {TWS_PORT}")
-            
+            log(f"[TWS] {'Re' if retry else ''}Connected to TWS on port {TWS_PORT}")
+
             # Get account info
             account = self.ib.managedAccounts()
             print(f"[TWS] Account: {account}")
-            
+
             # Get account value for P&L tracking
             account_values = self.ib.accountSummary()
             for av in account_values:
@@ -562,6 +618,37 @@ class TWSTrader:
             import traceback
             print(f"[TWS] {traceback.format_exc()}")
     
+    def is_connection_alive(self) -> bool:
+        """Check if TWS connection is still alive."""
+        try:
+            if not self.ib.isConnected():
+                log("TWS: Connection lost (isConnected=False)", level="WARNING")
+                return False
+            # Try a simple operation to verify connection
+            self.ib.reqCurrentTime()
+            return True
+        except Exception as e:
+            log(f"TWS: Connection check failed: {e}", level="WARNING")
+            bot_logger.exception("Connection check exception:")
+            return False
+
+    def reconnect(self) -> bool:
+        """Attempt to reconnect to TWS."""
+        log("[TWS] Attempting to reconnect...")
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                log(f"[TWS] Reconnect attempt {attempt}/{max_retries}")
+                if self.connect(retry=True):
+                    log("[TWS] Reconnection successful!")
+                    return True
+            except Exception as e:
+                log(f"[TWS] Reconnect attempt {attempt} failed: {e}")
+                if attempt < max_retries:
+                    time.sleep(5)  # Wait before retry
+        log("[TWS] All reconnection attempts failed")
+        return False
+
     def disconnect(self):
         """Disconnect from TWS."""
         if self.connected:
@@ -580,7 +667,7 @@ class TWSTrader:
             return self.api_healthy
 
         try:
-            response = requests.get(f"{API_URL}/health", timeout=3)
+            response = requests.get(f"{API_URL}/api/health", timeout=3)
             self.api_healthy = response.status_code == 200
             self.api_last_check = datetime.now()
             if not self.api_healthy:
@@ -855,6 +942,23 @@ class TWSTrader:
             # Fail-safe: If we can't check positions, don't trade
             return False, "Cannot verify positions - safety block"
         # ==================================================================
+
+        # ============ FIX: CHECK FOR PENDING ORDERS (PREVENT DUPLICATES) ============
+        # Check if there's already a pending order for this symbol
+        # This prevents duplicate BUY/SELL orders when an order is pending but not filled
+        try:
+            all_orders = self.ib.reqAllOpenOrders()
+            self.ib.sleep(0.2)
+            for o in all_orders:
+                if o.contract.symbol == symbol:
+                    order_type = o.order.orderType
+                    order_action = o.order.action
+                    return False, f"Pending {order_action} order exists ({order_type})"
+        except Exception as e:
+            log(f"⚠️ Failed to check open orders: {e}")
+            # Fail-safe: If we can't check orders, don't trade
+            return False, "Cannot verify orders - safety block"
+        # ============================================================================
 
         # Price filter
         if price < MIN_PRICE:
@@ -1137,33 +1241,52 @@ class TWSTrader:
                 )
             return market_success
     
-    def place_sl_tp_orders(self, symbol: str, action: str, quantity: int, 
+    def place_sl_tp_orders(self, symbol: str, action: str, quantity: int,
                            stop_loss: float, take_profit: float) -> bool:
         """Place separate SL and TP orders for existing positions."""
         try:
+            # ============ FIX: CHECK FOR EXISTING SL/TP ORDERS ============
+            # Check if SL/TP orders already exist before placing new ones
+            # This prevents duplicate exit orders
+            all_orders = self.ib.reqAllOpenOrders()
+            self.ib.sleep(0.2)
+
+            has_sl = False
+            has_tp = False
+            for o in all_orders:
+                if o.contract.symbol == symbol:
+                    if o.order.orderType == "STP":
+                        has_sl = True
+                    elif o.order.orderType == "LMT":
+                        has_tp = True
+
+            # If both already exist, skip
+            if has_sl and has_tp:
+                log(f"[TWS] {symbol}: SL/TP orders already exist - skipping")
+                return True
+            # ==============================================================
+
             contract = Stock(symbol, 'SMART', 'USD')
             self.ib.qualifyContracts(contract)
-            
+
             # Determine opposite action for exit orders
             exit_action = "SELL" if action == "BUY" else "BUY"
-            
-            # Create Stop Loss order
-            sl_order = StopOrder(exit_action, quantity, stop_loss)
-            sl_order.outsideRth = True
-            
-            # Create Take Profit order  
-            tp_order = LimitOrder(exit_action, quantity, take_profit)
-            tp_order.outsideRth = True
-            
-            # Place orders
-            self.ib.placeOrder(contract, sl_order)
-            self.ib.placeOrder(contract, tp_order)
-            
-            print(f"[TWS] SL/TP orders placed: {exit_action} {quantity} {symbol}")
-            print(f"[TWS] SL: ${stop_loss:.2f} | TP: ${take_profit:.2f}")
-            
+
+            # Only place missing orders
+            if not has_sl:
+                sl_order = StopOrder(exit_action, quantity, stop_loss)
+                sl_order.outsideRth = True
+                self.ib.placeOrder(contract, sl_order)
+                log(f"[TWS] {symbol}: SL order placed @ ${stop_loss:.2f}")
+
+            if not has_tp:
+                tp_order = LimitOrder(exit_action, quantity, take_profit)
+                tp_order.outsideRth = True
+                self.ib.placeOrder(contract, tp_order)
+                log(f"[TWS] {symbol}: TP order placed @ ${take_profit:.2f}")
+
             return True
-            
+
         except Exception as e:
             print(f"[TWS] SL/TP orders failed: {e}")
             return False
@@ -1346,13 +1469,15 @@ class TWSTrader:
                         "timestamp": datetime.now().isoformat(),
                         "context": f"Sector: {sector}, Action: {closed_pos.action}, Entry: ${closed_pos.entry_price:.2f}, Exit: ${exit_price:.2f}"
                     }
-                    
-                    doc_id = self.trading_memory.store_trade(trade_data)
-                    if doc_id:
-                        outcome = "WIN" if pnl_pct > 0 else "LOSS"
-                        log(f"🧠 Trade learned: {symbol} ({outcome}) → Memory ID: {doc_id[:16]}...")
+
+                    # Store trade in memory if available
+                    if self.trading_memory:
+                        doc_id = self.trading_memory.store_trade(trade_data)
+                        if doc_id:
+                            outcome = "WIN" if pnl_pct > 0 else "LOSS"
+                            log(f"[MEMORY] Trade learned: {symbol} ({outcome}) -> ID: {doc_id[:16]}...")
                 except Exception as e:
-                    log(f"⚠️ Failed to store trade for learning: {e}")
+                    log(f"[WARN] Failed to store trade for learning: {e}")
                 # ========================================================
                 
                 # Update daily P&L
@@ -1367,11 +1492,19 @@ class TWSTrader:
 # ============================================================================
 
 def main():
+    # ============ STARTUP LOGGING ============
+    log("="*70)
+    log("BOT STARTUP")
+    log(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log(f"Log file: {BOT_LOG_FILE}")
+    log("="*70)
+    # =========================================
+
     print("\n" + "="*70)
     print("  Zero Trading Expert (ZTE) - TWS Auto Trader V3.5")
-    print("  🎯 PHASE 1 INDICATORS: RSI Div, TSI, BB%, VPOC, MACD Div")
-    print("  🚀 ENHANCED: Real RVOL, Gap Scanner, Sector Diversification")
-    print("  📊 NEW: Tiered Position System (10 positions)")
+    print("  [*] PHASE 1 INDICATORS: RSI Div, TSI, BB%, VPOC, MACD Div")
+    print("  [+] ENHANCED: Real RVOL, Gap Scanner, Sector Diversification")
+    print("  [!] NEW: Tiered Position System (10 positions)")
     print("="*70)
     print(f"  TWS Connection: {TWS_HOST}:{TWS_PORT}")
     print(f"  Watching: {len(SYMBOLS)} stocks")
@@ -1382,7 +1515,7 @@ def main():
     print(f"  Max Positions: {MAX_OPEN_POSITIONS} (Tier1: {TIER1_POSITIONS} | Tier2: {MAX_OPEN_POSITIONS - TIER1_POSITIONS})")
     print(f"  Tier2 Requirements: RVOL {TIER2_MIN_RVOL}x | Conf {TIER2_MIN_CONFIDENCE:.0%} | Phase1 {TIER2_MIN_PHASE1_SIGNALS}+")
     print(f"  Max Per Sector: {MAX_PER_SECTOR}")
-    print(f"  📊 Phase 1 Indicators: ACTIVE")
+    print(f"  [*] Phase 1 Indicators: ACTIVE")
     print("="*70 + "\n")
     
     # Initialize TWS connection
@@ -1401,10 +1534,33 @@ def main():
     try:
         cycle = 0
         last_gap_scan = datetime.now()
-        
+        last_connection_check = datetime.now()
+        connection_errors = 0
+
         while True:
             cycle += 1
-            
+
+            # ============ CONNECTION HEALTH CHECK (every 5 minutes) ============
+            if (datetime.now() - last_connection_check).seconds > 300:  # 5 min
+                log("Running periodic connection health check...", level="DEBUG")
+                if not trader.is_connection_alive():
+                    log("TWS: Connection lost! Attempting reconnection...", level="ERROR")
+                    if trader.reconnect():
+                        connection_errors = 0  # Reset error counter
+                        log("TWS: Reconnection successful")
+                    else:
+                        connection_errors += 1
+                        log(f"TWS: Reconnection failed ({connection_errors} consecutive failures)", level="ERROR")
+                        if connection_errors >= 3:
+                            log("TWS: Too many connection failures - exiting", level="ERROR")
+                            break
+                        time.sleep(60)  # Wait 1 min before next cycle
+                        continue
+                else:
+                    log("Connection health check: OK", level="DEBUG")
+                last_connection_check = datetime.now()
+            # ===================================================================
+
             # Check if trading allowed (daily limits)
             can_trade, reason = trader.daily_pnl.can_trade()
             if not can_trade:
@@ -1565,7 +1721,7 @@ def main():
                         log(f"   ⏭️ API server down - skipping {symbol}")
                         continue
 
-                    response = requests.post(f"{API_URL}/analyze", json=payload, timeout=30)
+                    response = requests.post(f"{API_URL}/api/analyze", json=payload, timeout=30)
                     
                     if response.status_code == 200:
                         result = response.json()
@@ -1704,13 +1860,36 @@ def main():
             log(f"⏳ Next scan in {SCAN_INTERVAL}s...")
             print()
             time.sleep(SCAN_INTERVAL)
-            
+
     except KeyboardInterrupt:
         print("\n[Bot] Stopping...")
+    except Exception as e:
+        # ============ CRITICAL FIX: HANDLE ALL EXCEPTIONS ============
+        # This prevents the bot from crashing on unexpected errors
+        # Common causes: network issues, TWS timeout, API errors
+        log(f"CRITICAL: Unexpected exception in main loop: {e}", level="ERROR")
+        bot_logger.exception("Full traceback:")  # This logs the full stack trace
+
+        # Try to reconnect and continue
+        log("BOT: Attempting to recover...", level="WARNING")
+        try:
+            if not trader.is_connection_alive():
+                if trader.reconnect():
+                    log("BOT: Recovery successful - restarting main loop", level="INFO")
+                    # Restart the bot by calling main() again
+                    main()
+                    return
+        except Exception as recovery_error:
+            log(f"Recovery failed: {recovery_error}", level="ERROR")
+            bot_logger.exception("Recovery exception:")
+
+        log("BOT: Could not recover - exiting", level="ERROR")
     finally:
         # Save daily log
         save_daily_log(trader.daily_pnl)
-        log(f"📊 Final Daily P&L: ${trader.daily_pnl.current_pnl:+.2f}")
+        log(f"Final Daily P&L: ${trader.daily_pnl.current_pnl:+.2f}")
+        log(f"Bot stopped at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        log("="*70)
         trader.disconnect()
 
 

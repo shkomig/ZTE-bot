@@ -158,9 +158,10 @@ async def startup():
     print("\n" + "="*60)
     print("Zero Trading Expert (ZTE) - Starting...")
     print("="*60)
-    
+
     # Initialize memory
-    memory = TradingMemory()
+    # TEMP DISABLED: ChromaDB compatibility issue
+    memory = None  # TradingMemory()
     
     # Initialize orchestrator with config (including sentiment!)
     orchestrator = TradingOrchestrator({
@@ -173,7 +174,10 @@ async def startup():
     })
     
     print(f"\n[ZTE] Server ready on port {CONFIG.get('server', {}).get('port', 5001)}")
-    print(f"[ZTE] Memory stats: {memory.get_stats()}")
+    if memory:
+        print(f"[ZTE] Memory stats: {memory.get_stats()}")
+    else:
+        print("[ZTE] Memory: Disabled (ChromaDB issue)")
     print("="*60 + "\n")
 
 

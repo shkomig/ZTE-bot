@@ -128,9 +128,10 @@ class TradingOrchestrator:
             config: Configuration dictionary
         """
         self.config = config or {}
-        
+
         # Initialize components
-        self.memory = TradingMemory()
+        # TEMP DISABLED: ChromaDB compatibility issue
+        self.memory = None  # TradingMemory()
         self.analyzer = MarketAnalyzer(self.config.get("technical", {}))
         self.pattern_detector = PatternDetector(self.config.get("patterns", {}))
         
@@ -289,10 +290,12 @@ class TradingOrchestrator:
                 print(f"[ORCHESTRATOR] Sentiment analysis failed: {e}")
         
         # Step 4: Find Similar Trades
-        query = f"{symbol} {' '.join(signals)} {context or ''}"
-        print(f"[ORCHESTRATOR] Searching similar trades with query: {query}")
-        similar_trades = self.memory.find_similar_trades(query, n_results=5)
-        print(f"[ORCHESTRATOR] Found {len(similar_trades)} similar trades")
+        similar_trades = []
+        if self.memory:
+            query = f"{symbol} {' '.join(signals)} {context or ''}"
+            print(f"[ORCHESTRATOR] Searching similar trades with query: {query}")
+            similar_trades = self.memory.find_similar_trades(query, n_results=5)
+            print(f"[ORCHESTRATOR] Found {len(similar_trades)} similar trades")
         
         # Step 4: Generate Trading Thoughts (ToT)
         thoughts = self._generate_thoughts(
@@ -594,6 +597,19 @@ class TradingOrchestrator:
         # Wider range to allow sentiment to have bigger impact
         confidence = max(0.35, min(0.90, base_confidence))
         
+        # ============= V3.7.1 STRONG SIGNAL UPGRADE =============
+        # Upgrade BUY/SELL to STRONG_BUY/STRONG_SELL when confidence >= 70%
+        # This enables Tier2 positions which require STRONG signals
+        STRONG_THRESHOLD = 0.70  # 70% confidence = STRONG signal
+        
+        if confidence >= STRONG_THRESHOLD:
+            if action == "BUY":
+                action = "STRONG_BUY"
+                confidence_factors.append(f"Upgraded to STRONG_BUY ({confidence:.0%} >= 70%)")
+            elif action == "SELL":
+                action = "STRONG_SELL"
+                confidence_factors.append(f"Upgraded to STRONG_SELL ({confidence:.0%} >= 70%)")
+        
         print(f"[ORCHESTRATOR] Confidence calc: {' | '.join(confidence_factors)} = {confidence:.0%}")
         
         return action, round(confidence, 2)
@@ -693,7 +709,8 @@ class TradingOrchestrator:
     
     def record_result(self, trade_data: Dict[str, Any]):
         """Record a trade result for learning."""
-        self.memory.store_trade(trade_data)
+        if self.memory:
+            self.memory.store_trade(trade_data)
 
 
 # ===== TESTING =====

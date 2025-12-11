@@ -14,10 +14,15 @@ for p in positions:
     if p.position != 0:
         print(f"  {p.contract.symbol}: {p.position} shares @ ${p.avgCost:.2f}")
 
-orders = ib.openOrders()
+# Use reqAllOpenOrders for more reliable order checking
+orders = ib.reqAllOpenOrders()
+ib.sleep(0.5)
 print(f"\nOPEN ORDERS ({len(orders)}):")
 for o in orders:
-    print(f"  {o.action} {o.totalQuantity} {o.contract.symbol if hasattr(o, 'contract') else 'N/A'}")
+    symbol = o.contract.symbol if hasattr(o, 'contract') else 'N/A'
+    order_type = o.order.orderType
+    price = o.order.auxPrice if order_type == "STP" else o.order.lmtPrice
+    print(f"  {o.order.action} {int(o.order.totalQuantity)} {symbol} @ {order_type} ${price:.2f}")
 
 ib.disconnect()
 print("\n=== DONE ===")

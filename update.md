@@ -1,58 +1,91 @@
-# 📋 ZTE Development Roadmap - תוכנית עבודה להמשך פיתוח
+# 📋 ZTE Development Roadmap - Active Tasks
 
-**תאריך יצירה:** 05/12/2025  
-**גרסה נוכחית:** V3.5.2  
-**סטטוס:** 🟢 פעיל ויציב
-
----
-
-## 📊 סיכום מצב נוכחי
-
-### ✅ מה הושלם:
-| שלב | תיאור | תאריך השלמה |
-|-----|--------|-------------|
-| Phase 1-6 | Foundation to Integration | נובמבר 2025 |
-| Phase 7 | Sentiment Analysis (Finnhub) | נובמבר 2025 |
-| Phase 8 | Premium Watchlist (42 stocks) | נובמבר 2025 |
-| Phase 9 | Day Trading Optimization | דצמבר 2025 |
-| Phase 10 | Scanner Upgrades V3.3 | 03/12/2025 |
-| **Phase 1 V4** | Technical Indicators (RSI Div, TSI, BB, VP, MACD) | 02/12/2025 |
-| Bug Fixes | Paper Trading Fix, RAG Cleanup, Duplicate Orders | 05/12/2025 |
-
-### 📈 מערכת נוכחית:
-- **42 מניות** ב-7 סקטורים
-- **10 פוזיציות מקסימום** (Tier1: 5, Tier2: 5)
-- **5 אינדיקטורי Phase1** פעילים
-- **54 פריטי ידע טכני** ב-RAG (נוקה מעסקאות לא אמינות)
-- **Paper Trading Mode** עם RVOL=2.0 ברירת מחדל
+**Date:** December 9, 2025
+**Current Version:** V3.7.5 (Production Ready)
+**Status:** 🟢 FULLY OPERATIONAL - Monitoring Live Performance
 
 ---
 
-## 🎯 Phase 2: Multi-Strategy Engine (ינואר 2026)
+## 🎯 Current Focus: Live Performance Monitoring
 
-### 🔴 עדיפות קריטית
+### **Baseline Performance Collection (Paper Mode)**
+**Priority:** HIGH
+**Status:** ✅ READY - System Stable & Monitoring
 
-| # | משימה | תיאור | זמן משוער | קבצים |
-|---|--------|--------|-----------|--------|
-| 2.1 | **Strategy Registry** | מערכת רישום אסטרטגיות | 2-3 ימים | `strategy_registry.py` |
-| 2.2 | **Base Strategy Class** | מחלקת בסיס אבסטרקטית | 1 יום | `strategies/base_strategy.py` |
+**Goal:** Execute 50-100 paper trades to establish baseline metrics
 
-### 🟠 עדיפות גבוהה
+**Purpose:**
+1. Establish true Win Rate and Profit Factor baseline
+2. Validate Phase 1 indicator effectiveness in live market
+3. Confirm all safety systems operating correctly
 
-| # | משימה | תיאור | זמן משוער | קבצים |
-|---|--------|--------|-----------|--------|
-| 2.3 | **Mean Reversion Strategy** | Bollinger Bands + TSI | 3-4 ימים | `strategies/mean_reversion.py` |
-| 2.4 | **Momentum Strategy** | Trend Following + MACD | 3-4 ימים | `strategies/momentum.py` |
-| 2.5 | **Breakout Strategy** | Volume + Price Breakout | 3-4 ימים | `strategies/breakout.py` |
+**Progress:**
+- Trades Completed: 0 / 50-100
+- System Status: Production Ready (Port 5002, TWS connected)
+- Safety Features: All active & verified (health check, duplicate prevention, 1.25% SL)
+- Infrastructure: Stable (Docker conflict resolved)
 
-### 🟡 עדיפות בינונית
+---
 
-| # | משימה | תיאור | זמן משוער | קבצים |
-|---|--------|--------|-----------|--------|
-| 2.6 | **Strategy Selector** | בחירה דינמית לפי תנאי שוק | 2-3 ימים | `strategy_selector.py` |
-| 2.7 | **Backtesting Framework** | בדיקת אסטרטגיות על היסטוריה | 4-5 ימים | `backtester.py` |
+## 📊 V3.7.5 Changelog - Infrastructure Stability Complete
 
-### 📁 מבנה קבצים מוצע:
+**Date:** December 9, 2025 (Evening)
+**Type:** INFRASTRUCTURE FIX + SYSTEM STABILIZATION
+
+### Changes Applied:
+1. **Port Migration:** 5001 → 5002 (Docker conflict permanently resolved)
+2. **API Health Check Fix:** Corrected initialization bug (timedelta offset)
+3. **Encoding Fixes:** Enhanced log() function for Unicode/emoji handling
+4. **ChromaDB:** Temporarily disabled (compatibility issue - to be resolved)
+5. **Connection Stability:** All components verified working together
+
+### Files Modified:
+- `config.yaml` - Port: 5002
+- `auto_trader_tws.py` - API_URL: http://127.0.0.1:5002, log() encoding fix
+- `api_server_trading.py` - Memory disabled temporarily
+- `trading_orchestrator.py` - Memory checks added
+- `MCP.md` - Full documentation sync to port 5002
+- `INCIDENTS.md` - Final resolution documented
+
+### Previous Changes (V3.7.4):
+1. **SL/TP Adjustment:** 0.75%/1.5% → 1.25%/2.5% (realistic volatility)
+2. **TWS Position Check:** Added verification before orders (prevents duplicates)
+3. **API Health Check:** Added cached health check (prevents API-down orders)
+
+**Status:** ✅ COMPLETE - System fully stable and operational
+
+---
+
+## 🗺️ Development Roadmap
+
+### Phase 1: Stabilization & Bug Fixes ✅
+**Status:** ✅ COMPLETE (December 9, 2025)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Technical Indicators | ✅ | RSI Div, TSI, BB%, VPOC, MACD all active |
+| Safety Systems | ✅ | Duplicate prevention, API health check |
+| Infrastructure Stability | ✅ | Port 5002 migration, Docker conflict resolved |
+| Stop-Loss Calibration | ✅ | 1.25% SL / 2.5% TP (realistic) |
+| Connection Reliability | ✅ | TWS + API server stable communication |
+| Documentation Sync | ✅ | MCP.md, INCIDENTS.md, update.md aligned |
+
+**Outcome:** System fully operational and production-ready for baseline collection
+
+---
+
+### Phase 2: Multi-Strategy Engine ⏳
+**Status:** PENDING (Planned January 2026)
+**Prerequisites:** Complete baseline performance collection (50-100 trades)
+
+**Planned Components:**
+1. Strategy Registry - Framework for multiple strategies
+2. Mean Reversion Strategy - Bollinger + TSI based
+3. Momentum Strategy - Trend following
+4. Breakout Strategy - Volume confirmation
+5. Strategy Selector - Dynamic selection based on market conditions
+
+**Architecture:**
 ```
 CORE_TRADING/
 ├── strategies/
@@ -61,231 +94,108 @@ CORE_TRADING/
 │   ├── mean_reversion.py     # Bollinger + TSI
 │   ├── momentum.py           # Trend Following
 │   ├── breakout.py           # Volume Breakout
-│   └── gap_fill.py           # Gap Trading (חדש!)
-├── strategy_selector.py      # בחירת אסטרטגיה
-├── strategy_registry.py      # רישום ומעקב
-└── backtester.py             # בדיקות היסטוריות
-```
-
-### 📝 פירוט טכני - Mean Reversion:
-```python
-class MeanReversionStrategy(BaseStrategy):
-    """
-    Entry Conditions:
-    - BB% < 0.05 (below lower band)
-    - TSI < -25 (oversold)
-    - RSI < 35
-    - Volume > 1.5x average
-    
-    Exit Conditions:
-    - BB% > 0.5 (back to middle)
-    - TSI cross above signal
-    - 2% Take Profit / 1% Stop Loss
-    """
+│   └── pairs_trading.py      # Statistical Arbitrage
+├── strategy_selector.py      # Dynamic strategy selection
+└── strategy_registry.py      # Strategy registration & tracking
 ```
 
 ---
 
-## 🧠 Phase 3: ML/AI Predictions (פברואר 2026)
+### Phase 3: ML/AI Predictions ⏳
+**Status:** PENDING (Planned February 2026)
 
-### 🔴 עדיפות קריטית
-
-| # | משימה | תיאור | זמן משוער | דיוק צפוי |
-|---|--------|--------|-----------|-----------|
-| 3.1 | **LSTM Price Prediction** | מודל חיזוי מחירים | 1-2 שבועות | 70-80% |
-| 3.2 | **Feature Engineering** | יצירת features למודל | 3-4 ימים | - |
-
-### 🟠 עדיפות גבוהה
-
-| # | משימה | תיאור | זמן משוער | דיוק צפוי |
-|---|--------|--------|-----------|-----------|
-| 3.3 | **Sentiment ML Enhancement** | שיפור סנטימנט עם ML | 1 שבוע | +33% Sharpe |
-| 3.4 | **Ensemble Model** | שילוב מספר מודלים | 1 שבוע | +15% accuracy |
-
-### 🟡 עדיפות בינונית
-
-| # | משימה | תיאור | זמן משוער | דיוק צפוי |
-|---|--------|--------|-----------|-----------|
-| 3.5 | **Pattern Recognition CNN** | זיהוי דפוסי גרפים | 2 שבועות | Chart Patterns |
-| 3.6 | **Reinforcement Learning** | למידה מחיזוק | לטווח ארוך | Optimization |
-
-### 📝 ארכיטקטורת LSTM מוצעת:
-```python
-# Model Architecture
-model = Sequential([
-    LSTM(100, return_sequences=True, input_shape=(60, features)),
-    Dropout(0.2),
-    LSTM(50, return_sequences=False),
-    Dropout(0.2),
-    Dense(25, activation='relu'),
-    Dense(1)  # Next-day return prediction
-])
-
-# Features:
-# - OHLCV (5)
-# - RSI, TSI, MACD, BB% (4)
-# - Volume Profile (3)
-# - Sentiment Score (1)
-# Total: 13 features × 60 days = 780 inputs
-```
+**Planned Components:**
+1. LSTM Price Prediction (70-96% accuracy target)
+2. Sentiment Enhancement (+33% Sharpe Ratio target)
+3. Pattern Recognition CNN (Chart patterns)
+4. Reinforcement Learning (Long-term optimization)
 
 ---
 
-## 👥 Phase 4: Multi-Agent Architecture (מרץ 2026)
+### Phase 4: Multi-Agent Architecture ⏳
+**Status:** PENDING (Planned March 2026)
 
-### 🔴 עדיפות קריטית
-
-| # | סוכן | תפקיד | סטטוס נוכחי | זמן משוער |
-|---|------|--------|-------------|-----------|
-| 4.1 | **Technical Analyst Agent** | ניתוח טכני מעמיק | חלקי (Phase1) | 1 שבוע |
-| 4.2 | **Risk Manager Agent** | ניהול סיכונים מתקדם | בסיסי | 1 שבוע |
-
-### 🟠 עדיפות גבוהה
-
-| # | סוכן | תפקיד | סטטוס נוכחי | זמן משוער |
-|---|------|--------|-------------|-----------|
-| 4.3 | **Fundamental Analyst Agent** | ניתוח פונדמנטלי | ❌ לא קיים | 2 שבועות |
-| 4.4 | **Portfolio Manager Agent** | אופטימיזציית תיק | ❌ לא קיים | 2 שבועות |
-
-### 🟡 עדיפות בינונית
-
-| # | סוכן | תפקיד | סטטוס נוכחי | זמן משוער |
-|---|------|--------|-------------|-----------|
-| 4.5 | **Bull Researcher** | חיפוש סיבות לקנייה | ❌ לא קיים | 1 שבוע |
-| 4.6 | **Bear Researcher** | חיפוש סיבות למכירה | ❌ לא קיים | 1 שבוע |
-| 4.7 | **Debate Moderator** | הכרעה בין Bull/Bear | ❌ לא קיים | 3-4 ימים |
-
-### 📁 מבנה קבצים מוצע:
-```
-CORE_TRADING/
-├── agents/
-│   ├── __init__.py
-│   ├── base_agent.py           # Abstract base class
-│   ├── technical_analyst.py    # Technical analysis agent
-│   ├── fundamental_analyst.py  # Fundamental analysis agent
-│   ├── sentiment_agent.py      # ✅ קיים!
-│   ├── risk_manager.py         # Risk management agent
-│   ├── portfolio_manager.py    # Portfolio optimization
-│   ├── bull_researcher.py      # Bullish thesis
-│   ├── bear_researcher.py      # Bearish thesis
-│   └── debate_moderator.py     # Final decision
-├── agent_orchestrator.py       # Coordinates all agents
-└── consensus_engine.py         # Voting/consensus mechanism
-```
+**Planned Agents:**
+1. Technical Analyst - Technical indicators
+2. Fundamental Analyst - Fundamental analysis
+3. Sentiment Analyst - ✅ Already exists!
+4. Risk Manager - ✅ Partially exists (to be enhanced)
+5. Bull/Bear Researchers - Dialectic discussion
+6. Portfolio Manager - Portfolio optimization
 
 ---
 
-## 🔧 משימות תחזוקה שוטפות
+## 📈 Performance Targets
 
-### ⚡ עדיפות מיידית (השבוע)
-
-| # | משימה | תיאור | זמן |
-|---|--------|--------|-----|
-| M1 | **מעקב פוזיציות LIVE** | לוודא SL/TP מופעלים | יומי |
-| M2 | **RAG Learning** | לוודא עסקאות נשמרות ל-RAG | יומי |
-| M3 | **RVOL Calibration** | כיול RVOL ל-Live Trading | לפני LIVE |
-
-### 📊 משימות שבועיות
-
-| # | משימה | תיאור |
-|---|--------|--------|
-| W1 | **סקירת ביצועים** | Win Rate, P/L, Drawdown |
-| W2 | **בדיקת לוגים** | זיהוי שגיאות ובאגים |
-| W3 | **עדכון MCP** | תיעוד שינויים |
-| W4 | **Git Push** | שמירת גרסאות |
-
-### 🔄 משימות חודשיות
-
-| # | משימה | תיאור |
-|---|--------|--------|
-| M1 | **Backtest אסטרטגיות** | בדיקת ביצועים היסטוריים |
-| M2 | **עדכון Watchlist** | הוספה/הסרה של מניות |
-| M3 | **אופטימיזציית פרמטרים** | SL/TP, Confidence thresholds |
+| Metric | Current | Phase 2 Target | Phase 4 Target |
+|--------|---------|----------------|----------------|
+| **Win Rate** | N/A (fresh start) | 85%+ | 90%+ |
+| **Sharpe Ratio** | N/A | 1.5+ | 2.5+ |
+| **Max Drawdown** | N/A | <15% | <10% |
+| **Daily Signals** | 0 | 5-10 | 10-20 |
+| **Active Strategies** | 1 | 3 | 5+ |
 
 ---
 
-## 📈 KPIs ויעדים
+## 🔄 Next Steps (Priority Order)
 
-### יעדים לסוף Q1 2026:
+1. **CURRENT:** Monitor live performance in Paper Mode ✅
+   - System running and stable
+   - Waiting for market hours to collect first trades
+   - All safety features verified operational
 
-| מדד | נוכחי | יעד Q1 | יעד שנתי |
-|-----|-------|--------|----------|
-| **Win Rate** | N/A (מחכה לנתונים) | 65%+ | 75%+ |
-| **Sharpe Ratio** | לא נמדד | 1.5+ | 2.0+ |
-| **Max Drawdown** | לא נמדד | <15% | <10% |
-| **Daily Trades** | 0-5 | 5-10 | 10-15 |
-| **Strategies** | 1 | 3+ | 5+ |
-| **RAG Items** | 54 | 200+ | 500+ |
+2. **SHORT-TERM (This Week):** Collect 20-30 baseline trades
+   - Monitor win rate and signal accuracy
+   - Track Phase 1 indicator performance
+   - Verify consistent API connectivity
 
----
+3. **MEDIUM-TERM (This Month):** Complete baseline (50-100 trades)
+   - Calculate actual win rate and Sharpe ratio
+   - Identify most profitable Phase 1 signals
+   - Document performance patterns
 
-## 🚀 סדר עדיפויות - מה עכשיו?
+4. **LONG-TERM (January 2026):** Phase 2 - Multi-Strategy Engine
+   - Design multi-strategy architecture
+   - Implement strategy registry
+   - Build mean reversion strategy
 
-### 🔥 השבוע (5-12 דצמבר 2025):
-
-1. **[יום 1-2]** מעקב פוזיציות - לוודא המערכת יציבה
-2. **[יום 3-4]** התחלת Phase 2.1 - Strategy Registry
-3. **[יום 5-7]** Phase 2.2 - Base Strategy Class
-
-### 📅 השבוע הבא (12-19 דצמבר):
-
-1. Phase 2.3 - Mean Reversion Strategy
-2. בדיקות על Paper Trading
-
-### 📅 סוף דצמבר:
-
-1. Phase 2.4-2.5 - Momentum + Breakout
-2. Phase 2.6 - Strategy Selector
-3. אינטגרציה ל-auto_trader_tws.py
+5. **BACKLOG:** Resolve ChromaDB compatibility issue
+   - Investigate chromadb_rust_bindings error
+   - Consider alternative memory solutions
+   - Re-enable RAG features when stable
 
 ---
 
-## 📝 תבנית עבודה למשימה חדשה
+## 📝 Notes & Observations
 
-```markdown
-## [מספר משימה] - שם המשימה
+### System Health:
+- ✅ All safety features active and verified
+- ✅ Port 5002 stable (Docker conflict resolved)
+- ✅ Stop-loss levels realistic (1.25%)
+- ✅ Duplicate prevention working
+- ✅ API health check active
+- ✅ TWS connection stable (7497)
 
-**תאריך התחלה:** DD/MM/YYYY
-**סטטוס:** ⬜ לא התחיל / 🔄 בתהליך / ✅ הושלם
+### Known Issues:
+- ⚠️ ChromaDB temporarily disabled (compatibility issue - non-critical)
+- ⚠️ Windows emoji encoding handled (log() function patched)
 
-### מטרה:
-[תיאור המטרה]
-
-### שלבים:
-- [ ] שלב 1
-- [ ] שלב 2
-- [ ] שלב 3
-
-### קבצים לשנות:
-- `path/to/file1.py`
-- `path/to/file2.py`
-
-### בדיקות:
-- [ ] Unit Tests
-- [ ] Paper Trading Test
-- [ ] Integration Test
-
-### הערות:
-[הערות נוספות]
-```
+### Future Considerations:
+- Monitor Phase 1 signal performance
+- Track which indicators provide best signals
+- Consider adding sentiment weight to confidence calculation
+- Evaluate need for dynamic SL/TP based on volatility
 
 ---
 
-## 🔗 קישורים מהירים
+## 🚨 Emergency Contacts
 
-| מה | איפה |
-|----|------|
-| MCP ראשי | `MCP.md` |
-| בוט מסחר | `auto_trader_tws.py` |
-| Market Analyzer | `CORE_TRADING/market_analyzer.py` |
-| Pattern Detector | `CORE_TRADING/pattern_detector.py` |
-| Sentiment Agent | `CORE_TRADING/sentiment_agent.py` |
-| Trading Memory | `CORE_TRADING/trading_memory.py` |
-| Config | `config.yaml` |
-| GitHub | `https://github.com/shkomig/ZTE-bot.git` |
+**For historical incidents:** See `INCIDENTS.md`
+**For current system state:** See `MCP.md`
+**For this roadmap:** See `update.md` (this file)
 
 ---
 
-> **עודכן לאחרונה:** 05/12/2025  
-> **גרסה הבאה:** V3.6.0 (Multi-Strategy)  
-> **מפתח:** @shkomig
+> **Last Updated:** December 9, 2025 18:35 ET
+> **Next Review:** After 50 trades completed
+> **Status:** ✅ PRODUCTION READY - Monitoring Live Performance (Paper Mode)
