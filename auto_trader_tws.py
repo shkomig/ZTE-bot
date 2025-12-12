@@ -1240,7 +1240,28 @@ class TWSTrader:
                     lowest_price=entry_price
                 )
             return market_success
-    
+
+    def place_market_order(self, symbol: str, action: str, quantity: int) -> bool:
+        """Place a simple market order."""
+        try:
+            contract = Stock(symbol, 'SMART', 'USD')
+            self.ib.qualifyContracts(contract)
+
+            # Create market order
+            order = MarketOrder(action, quantity)
+            order.outsideRth = True  # Enable after-hours trading
+
+            # Place order
+            trade = self.ib.placeOrder(contract, order)
+            self.ib.sleep(1)  # Give time for order to process
+
+            log(f"[TWS] Market order placed: {action} {quantity} {symbol}")
+            return True
+
+        except Exception as e:
+            log(f"[TWS] Market order failed: {e}", level="ERROR")
+            return False
+
     def place_sl_tp_orders(self, symbol: str, action: str, quantity: int,
                            stop_loss: float, take_profit: float) -> bool:
         """Place separate SL and TP orders for existing positions."""
