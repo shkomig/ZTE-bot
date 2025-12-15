@@ -129,26 +129,27 @@ bot_logger = setup_logging()
 # V3.7.3: Optimized for Day Trading - realistic TP/SL based on actual daily moves
 
 MAX_POSITION_VALUE = 5000    # Max $ per position
-MAX_SL_PCT = 0.0125          # 1.25% Stop Loss (FIXED: was 0.75% - too tight!)
-MAX_TP_PCT = 0.025           # 2.5% Take Profit (R:R = 1:2) - Realistic for volatility
-MIN_CONFIDENCE = 0.50        # Minimum confidence to execute
+MAX_SL_PCT = 0.02            # 2.0% Stop Loss (V3.7.7: Hardening - wider SL for quality)
+MAX_TP_PCT = 0.025           # 2.5% Take Profit (R:R = 1:1.25) - Conservative but realistic
+MIN_CONFIDENCE = 0.75        # V3.7.7: Hardening - 75% minimum confidence (was 50%)
 
 # Daily Risk Limits
 MAX_DAILY_LOSS_PCT = 0.03    # 3% max daily loss - STOP trading
 MAX_TRADES_PER_DAY = 20      # Maximum trades per day
-MAX_OPEN_POSITIONS = 10      # Maximum concurrent positions (Tier 1 + Tier 2)
+MAX_OPEN_POSITIONS = 5       # V3.7.7: Hardening - Reduced to 5 (was 10) for better quality
 
 # ============================================================================
-# TIERED POSITION SYSTEM (V3.5)
+# TIERED POSITION SYSTEM (V3.7.7 - HARDENED)
 # ============================================================================
-# Tier 1 (positions 1-5): Standard requirements
-# Tier 2 (positions 6-10): Stricter requirements for quality trades only
+# V3.7.7: Simplified to single tier - all positions require high quality
+# All 5 positions now use same strict requirements
 
-TIER1_POSITIONS = 5              # First 5 positions - standard requirements
-TIER2_MIN_CONFIDENCE = 0.65      # Tier 2: Higher confidence required (65%)
-TIER2_MIN_RVOL = 2.0             # Tier 2: Higher RVOL required (2.0x)
-TIER2_MIN_PHASE1_SIGNALS = 2     # Tier 2: Minimum 2 Phase1 signals
-TIER2_REQUIRE_STRONG_BUY = True  # Tier 2: Only STRONG_BUY actions
+TIER1_POSITIONS = 5              # All positions (no tier 2 anymore - max 5 total)
+MIN_PHASE1_SIGNALS = 3           # V3.7.7: Minimum 3 Phase1 signals required (was 2)
+TIER2_MIN_CONFIDENCE = 0.80      # Tier 2: Not used (only 5 positions now)
+TIER2_MIN_RVOL = 2.5             # Tier 2: Not used (only 5 positions now)
+TIER2_MIN_PHASE1_SIGNALS = 3     # Tier 2: Not used (only 5 positions now)
+TIER2_REQUIRE_STRONG_BUY = True  # Tier 2: Not used (only 5 positions now)
 
 # ============================================================================
 # DAY TRADING FILTERS
@@ -979,33 +980,21 @@ class TWSTrader:
         current_positions = len(self.positions)
         if current_positions >= MAX_OPEN_POSITIONS:
             return False, f"Max positions reached ({MAX_OPEN_POSITIONS})"
-        
-        # Tier 2 requirements (positions 6-10)
-        if current_positions >= TIER1_POSITIONS:
-            # Stricter RVOL for Tier 2
-            if rvol < TIER2_MIN_RVOL:
-                return False, f"Tier2: Low RVOL ({rvol:.1f}x < {TIER2_MIN_RVOL}x)"
-            
-            # Require minimum Phase1 signals for Tier 2
-            if phase1_signals is None or len(phase1_signals) < TIER2_MIN_PHASE1_SIGNALS:
-                signal_count = len(phase1_signals) if phase1_signals else 0
-                return False, f"Tier2: Need {TIER2_MIN_PHASE1_SIGNALS}+ Phase1 signals (got {signal_count})"
-            
-            # Require STRONG_BUY for Tier 2
-            if TIER2_REQUIRE_STRONG_BUY and zte_action not in ["STRONG_BUY", "STRONG_SELL"]:
-                return False, f"Tier2: Requires STRONG signal (got {zte_action})"
-        
+
+        # V3.7.7: All positions now require minimum Phase1 signals (hardening)
+        if phase1_signals is None or len(phase1_signals) < MIN_PHASE1_SIGNALS:
+            signal_count = len(phase1_signals) if phase1_signals else 0
+            return False, f"Need {MIN_PHASE1_SIGNALS}+ Phase1 signals (got {signal_count})"
+
         # Already in position
         if symbol in self.positions:
             return False, "Already in position"
-        
+
         # Sector diversification check
         if not self.check_sector_exposure(symbol):
             return False, f"Max positions in sector ({MAX_PER_SECTOR})"
-        
-        # Determine tier for logging
-        tier = "Tier1" if current_positions < TIER1_POSITIONS else "Tier2"
-        return True, f"OK ({tier})"
+
+        return True, "OK"
     
     def get_current_tier(self) -> str:
         """Get current tier based on position count."""
@@ -1530,12 +1519,15 @@ def main():
     print(f"  TWS Connection: {TWS_HOST}:{TWS_PORT}")
     print(f"  Watching: {len(SYMBOLS)} stocks")
     print(f"  Scan Interval: {SCAN_INTERVAL}s")
-    print(f"  Min Confidence: {MIN_CONFIDENCE:.0%}")
-    print(f"  Min RVOL: {MIN_RVOL}x")
-    print(f"  Max Daily Loss: {MAX_DAILY_LOSS_PCT:.1%}")
-    print(f"  Max Positions: {MAX_OPEN_POSITIONS} (Tier1: {TIER1_POSITIONS} | Tier2: {MAX_OPEN_POSITIONS - TIER1_POSITIONS})")
-    print(f"  Tier2 Requirements: RVOL {TIER2_MIN_RVOL}x | Conf {TIER2_MIN_CONFIDENCE:.0%} | Phase1 {TIER2_MIN_PHASE1_SIGNALS}+")
+    print(f"  Max Positions: {MAX_OPEN_POSITIONS} (V3.7.7: Hardened - Quality over Quantity)")
     print(f"  Max Per Sector: {MAX_PER_SECTOR}")
+    print(f"  Max Daily Loss: {MAX_DAILY_LOSS_PCT:.1%}")
+    print(f"")
+    print(f"  [!] HARDENED REQUIREMENTS (V3.7.7):")
+    print(f"     Min Confidence: {MIN_CONFIDENCE:.0%} (was 50%)")
+    print(f"     Min Phase1 Signals: {MIN_PHASE1_SIGNALS}+ (was 2)")
+    print(f"     Min RVOL: {MIN_RVOL}x")
+    print(f"     Stop Loss: {MAX_SL_PCT:.1%} (wider for quality)")
     print(f"  [*] Phase 1 Indicators: ACTIVE")
     print("="*70 + "\n")
     
@@ -1761,42 +1753,25 @@ def main():
                             log(f"🔥 {symbol}: {action} ({confidence:.1%}) RVOL={rvol:.1f}x [{tier}]")
                             print(f"   Reason: {result.get('reasoning', '')[:80]}...")
                             
-                            # ⚡ V3.5 TIERED POSITION SYSTEM
-                            # Determine minimum requirements based on current tier
-                            current_positions = len(trader.positions)
-                            is_tier2 = current_positions >= TIER1_POSITIONS
-                            
-                            # Set thresholds based on tier
-                            if is_tier2:
-                                min_confidence = TIER2_MIN_CONFIDENCE
-                                min_rvol = TIER2_MIN_RVOL
-                                min_signals = TIER2_MIN_PHASE1_SIGNALS
-                                require_strong = TIER2_REQUIRE_STRONG_BUY
-                            else:
-                                min_confidence = MIN_CONFIDENCE
-                                min_rvol = MIN_RVOL
-                                min_signals = 1
-                                require_strong = False
-                            
-                            # Check tier requirements
-                            tier_passed = True
-                            tier_reason = ""
-                            
-                            if confidence < min_confidence:
-                                tier_passed = False
-                                tier_reason = f"Confidence {confidence:.1%} < {min_confidence:.0%}"
-                            elif rvol < min_rvol:
-                                tier_passed = False
-                                tier_reason = f"RVOL {rvol:.1f}x < {min_rvol:.1f}x"
-                            elif len(phase1_signals) < min_signals:
-                                tier_passed = False
-                                tier_reason = f"Phase1 signals {len(phase1_signals)} < {min_signals}"
-                            elif require_strong and action not in ["STRONG_BUY", "STRONG_SELL"]:
-                                tier_passed = False
-                                tier_reason = f"Tier2 requires STRONG signal (got {action})"
-                            
-                            if not tier_passed:
-                                log(f"   ⏭️ {tier} requirements not met: {tier_reason}")
+                            # ⚡ V3.7.7 HARDENED REQUIREMENTS
+                            # All positions now use same strict requirements (no tiers)
+
+                            # Check hardened requirements
+                            req_passed = True
+                            req_reason = ""
+
+                            if confidence < MIN_CONFIDENCE:
+                                req_passed = False
+                                req_reason = f"Confidence {confidence:.1%} < {MIN_CONFIDENCE:.0%}"
+                            elif rvol < MIN_RVOL:
+                                req_passed = False
+                                req_reason = f"RVOL {rvol:.1f}x < {MIN_RVOL:.1f}x"
+                            elif len(phase1_signals) < MIN_PHASE1_SIGNALS:
+                                req_passed = False
+                                req_reason = f"Phase1 signals {len(phase1_signals)} < {MIN_PHASE1_SIGNALS}"
+
+                            if not req_passed:
+                                log(f"   ⏭️ Requirements not met: {req_reason}")
                                 continue
                             
                             # Execute trade - passed all tier requirements
@@ -1880,6 +1855,11 @@ def main():
             
             log(f"⏳ Next scan in {SCAN_INTERVAL}s...")
             print()
+
+            # Heartbeat: Log every 5 cycles to confirm bot is alive
+            if cycle % 5 == 0:
+                log(f"💓 Heartbeat: Cycle {cycle} - Bot alive and running", level="DEBUG")
+
             time.sleep(SCAN_INTERVAL)
 
     except KeyboardInterrupt:

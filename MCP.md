@@ -1,54 +1,65 @@
 # 📈 Zero Trading Expert (ZTE) - Master Control Protocol
 
-**Last Updated:** December 9, 2025
-**Current Version:** V3.7.5 (Port Migration Complete)
-**Status:** 🟢 OPERATIONAL - Fully Stable
+**Last Updated:** December 15, 2025
+**Current Version:** V3.7.7 (Hardening Phase - Quality over Quantity)
+**Status:** 🟢 OPERATIONAL - Process Supervision + Hardened Filters
 **API Port:** 5002 ✅ MIGRATED (Docker conflict resolved)
 **TWS Port:** 7497 (Paper Trading)
 
 ### 📊 Current Status:
 | Metric | Value | Notes |
 |--------|-------|-------|
-| **RAG Memory** | 54 items | Technical knowledge only |
+| **Process Supervisor** | ✅ launcher.py | Auto-restart on crashes |
+| **RAG Memory** | Disabled | ChromaDB compatibility issue |
 | **Sentiment Engine** | **FinBERT** | Fully integrated |
-| **LIVE Win Rate** | N/A | Fresh start, collecting data |
-| **Max Positions** | **10** | Tier1: 5 + Tier2: 5 |
-| **Open Positions** | **0** | Clean slate after incident cleanup |
+| **Max Positions** | **5** | V3.7.7: Reduced from 10 for quality |
+| **Min Confidence** | **75%** | V3.7.7: Hardened from 50% |
+| **Min Phase1 Signals** | **3** | V3.7.7: Hardened from 2 |
 
 ---
 
-## 🛡️ **Current System Configuration (V3.7.4)**
+## 🛡️ **Current System Configuration (V3.7.7 - HARDENED)**
 
-### Critical Safety Features (Post-Emergency Fixes):
+### Critical Safety Features:
 
 | Feature | Status | Description |
 |---------|--------|-------------|
+| **Process Supervisor** | ✅ NEW | launcher.py monitors & auto-restarts both processes |
 | **API Health Check** | ✅ ACTIVE | Checks API availability before each trade cycle |
-| **TWS Position Verification** | ✅ ACTIVE | Verifies actual broker positions before orders |
+| **Connection Recovery** | ✅ ACTIVE | Auto-reconnects to TWS every 5 minutes |
+| **Duplicate Order Prevention** | ✅ ACTIVE | Checks pending orders before entry & exit |
 | **Port Configuration** | ✅ MIGRATED | Bot → 5002, API → 5002 (Docker conflict resolved) |
-| **Stop-Loss** | ✅ FIXED | 1.25% (was 0.75% - too tight!) |
-| **Take-Profit** | ✅ FIXED | 2.5% (maintains 1:2 R:R) |
+| **Stop-Loss** | ✅ WIDENED | 2.0% (was 1.25% - gives quality trades room) |
+| **Take-Profit** | ✅ FIXED | 2.5% (maintains 1:1.25 R:R) |
 
-### Risk Management Settings:
+### Risk Management Settings (V3.7.7 - HARDENED):
 
 ```python
-# CURRENT SETTINGS (V3.7.5 - Production Ready)
+# CURRENT SETTINGS (V3.7.7 - Quality over Quantity)
 API_URL = "http://127.0.0.1:5002"      # Port 5002: Docker conflict resolved
-MAX_SL_PCT = 0.0125                    # 1.25% Stop Loss (realistic volatility)
-MAX_TP_PCT = 0.025                     # 2.5% Take Profit (R:R 1:2)
+MAX_SL_PCT = 0.02                      # 2.0% Stop Loss (wider for quality trades)
+MAX_TP_PCT = 0.025                     # 2.5% Take Profit (R:R 1:1.25)
 MAX_POSITION_VALUE = 5000              # Max $ per position
-MIN_CONFIDENCE = 0.50                  # Minimum confidence to execute
-MAX_OPEN_POSITIONS = 10                # Tier1: 5 + Tier2: 5
+MIN_CONFIDENCE = 0.75                  # 75% minimum confidence (was 50%)
+MIN_PHASE1_SIGNALS = 3                 # Minimum 3 Phase1 signals (was 2)
+MAX_OPEN_POSITIONS = 5                 # 5 positions max (was 10)
 MAX_DAILY_LOSS_PCT = 0.03              # 3% max daily loss
 MAX_TRADES_PER_DAY = 20                # Maximum trades per day
+MIN_RVOL = 1.5                         # Minimum 1.5x relative volume
 ```
 
-### Tiered Position System:
+### Position System (V3.7.7 - Simplified):
 
-| Tier | Positions | Confidence | RVOL | Phase1 Signals | Action Required |
-|------|-----------|------------|------|----------------|-----------------|
-| **Tier1** | 1-5 | ≥50% | ≥1.5x | 1+ | BUY/SELL |
-| **Tier2** | 6-10 | ≥65% | ≥2.0x | 2+ | STRONG_BUY/SELL only |
+**All 5 positions now use same strict requirements:**
+
+| Requirement | Value | Notes |
+|-------------|-------|-------|
+| **Confidence** | ≥75% | Hardened from 50% |
+| **RVOL** | ≥1.5x | Minimum relative volume |
+| **Phase1 Signals** | ≥3 | Hardened from 2 |
+| **Max Per Sector** | 2 | Diversification required |
+
+**No more tiers - focus on quality over quantity!**
 
 ---
 
@@ -117,6 +128,43 @@ for pos in tws_positions:
         return False, f"Already in position (TWS: {int(pos.position)} shares)"
 ```
 
+#### 3. Process Supervisor (V3.7.7 - NEW)
+```python
+# launcher.py - Monitors both API Server and Trading Bot
+# Auto-restarts either process if it crashes
+# Graceful shutdown on Ctrl+C
+
+PROCESSES = {
+    'api_server': {
+        'command': ['python', 'api_server_trading.py'],
+        'startup_delay': 5,  # Wait for API to be ready
+        'restart_delay': 3
+    },
+    'trader_bot': {
+        'command': ['python', 'auto_trader_tws.py'],
+        'startup_delay': 0,
+        'restart_delay': 3
+    }
+}
+```
+
+**Usage:**
+```bash
+# Start entire system with supervision
+python launcher.py
+
+# Press Ctrl+C to shutdown gracefully
+```
+
+**Features:**
+- Starts API Server first, waits 5 seconds for initialization
+- Starts Trading Bot after API is ready
+- Monitors both processes every 10 seconds
+- Auto-restarts crashed processes (with 3s delay)
+- Logs all restart events
+- Status report every 5 minutes
+- Graceful shutdown: stops Bot first (prevent new trades), then API
+
 ---
 
 ## 📁 File Structure
@@ -126,8 +174,9 @@ C:\AI-ALL-PRO\ZERO-TRADING-EXPERT\
 ├── MCP.md                          # This document - CURRENT STATE ONLY
 ├── INCIDENTS.md                    # Historical incident reports (SEE THIS FOR HISTORY)
 ├── update.md                       # Development roadmap & active tasks
+├── launcher.py                     # ⭐ V3.7.7: Process Supervisor (NEW!)
 ├── api_server_trading.py           # API Server (Port 5002)
-├── auto_trader_tws.py              # Trading Bot (V3.7.5 - Stable)
+├── auto_trader_tws.py              # Trading Bot (V3.7.7 - Hardened)
 ├── close_excess_positions.py       # Emergency cleanup script
 ├── config.yaml                     # Configuration
 ├── requirements.txt                # Dependencies
@@ -329,35 +378,65 @@ technical:
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (V3.7.7 - RECOMMENDED)
 
 ### Prerequisites:
 1. TWS or IB Gateway running on port 7497 (Paper Trading)
-2. API server running: `python api_server_trading.py`
-3. Virtual environment activated
+2. Virtual environment activated (if using venv)
 
-### Launch Trading Bot:
+### Launch Entire System (RECOMMENDED):
 ```bash
-# With virtual environment:
-.venv\Scripts\python.exe auto_trader_tws.py
+# V3.7.7: Use the process supervisor (auto-restarts on crashes)
+python launcher.py
 
-# Or directly:
+# Press Ctrl+C to shutdown gracefully
+```
+
+**The launcher will:**
+- Start API Server first (port 5002)
+- Wait 5 seconds for API to initialize
+- Start Trading Bot
+- Monitor both processes and auto-restart on crashes
+- Log all restart events
+
+### Manual Launch (Legacy - Not Recommended):
+```bash
+# Terminal 1: Start API Server
+python api_server_trading.py
+
+# Terminal 2: Start Trading Bot (wait 5 seconds after API starts)
 python auto_trader_tws.py
 ```
+
+**Note:** Manual launch doesn't have auto-restart. If either process crashes, you must manually restart it.
 
 ### Verify System Health:
 Look for these startup messages:
 ```
+[2025-12-15 10:00:00] [INFO] === ZTE System Supervisor Starting ===
+[2025-12-15 10:00:00] [INFO] Starting API Server...
+[2025-12-15 10:00:00] [INFO] API Server started (PID: 12345)
+[2025-12-15 10:00:05] [INFO] Starting Trading Bot...
+[2025-12-15 10:00:05] [INFO] Trading Bot started (PID: 12346)
+[2025-12-15 10:00:05] [INFO] === All systems running ===
+
 [TWS] Connected to TWS on port 7497
 [TWS] Account Balance: ${balance}
-[TWS] Loaded 0 existing positions    # Should be 0 (clean slate)
+[TWS] Loaded 0 existing positions
+
+🛡️ HARDENED REQUIREMENTS (V3.7.7):
+   Min Confidence: 75% (was 50%)
+   Min Phase1 Signals: 3+ (was 2)
+   Min RVOL: 1.5x
+   Stop Loss: 2.0% (wider for quality)
 ```
 
-During operation, watch for safety features:
+During operation, watch for hardened filters:
 ```
 ✅ API server healthy
-✅ Already in position (TWS: X shares)  # Duplicate prevention working
-📉 SL: ${price} (-1.2%) | 📈 TP: ${price} (+2.5%)  # Correct percentages
+⏭️ Requirements not met: Confidence 68.5% < 75.0%
+⏭️ Requirements not met: Phase1 signals 2 < 3
+📉 SL: ${price} (-2.0%) | 📈 TP: ${price} (+2.5%)  # V3.7.7: Wider SL
 ```
 
 ---
